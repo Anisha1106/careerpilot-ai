@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build application images
+        run: docker compose build api web
+
+      - name: Install test tools and run backend tests
+        run: >-
+          docker compose run --rm
+          -v "${{ github.workspace }}/backend:/app"
+          api sh -c "pip install -r requirements-dev.txt && python -m pytest -q"
+
+      - name: Run synthetic ranking smoke evaluation
+        run: >-
+          docker compose run --rm
+          -v "${{ github.workspace }}/backend:/app"
+          api python evaluate_matching.py --k 3
+
+      - name: Stop Compose services
+        if: always()
+        run: docker compose down
