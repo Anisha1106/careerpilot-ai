@@ -25,8 +25,37 @@ export default function App() {
   function notify(message){setToast(message);setTimeout(()=>setToast(''),2600)}
   function logout(){localStorage.removeItem('careerpilot_token');setToken('');setUser(null);setDashboard(null)}
   async function loginAction(e){e.preventDefault();setError('');setBusy(true);try{const d=await api('/auth/'+(e.currentTarget.dataset.mode||'login'),{method:'POST',body:JSON.stringify({email:e.currentTarget.email.value,password:e.currentTarget.password.value})});localStorage.setItem('careerpilot_token',d.token);setToken(d.token);setUser(d.user)}catch(err){setError(err.message)}finally{setBusy(false)}}
-  async function saveProfile(e){e?.preventDefault();setBusy(true);try{const p={...profile,graduation_year:profile.graduation_year?Number(profile.graduation_year):null,skills:split(profile.skills),projects:split(profile.projects),experience:split(profile.experience)};const d=await api('/profile',{method:'PUT',body:JSON.stringify(p)});setProfile({...emptyProfile,...d});notify('Profile saved');refresh()}catch(err){setError(err.message)}finally{setBusy(false)}}
-  function split(value){return Array.isArray(value)?value:value.split(',').map(x=>x.trim()).filter(Boolean)}
+  async function saveProfile(event) {
+    event?.preventDefault();
+    setBusy(true);
+
+    try {
+      const profileToSave = {
+        ...profile,
+        graduation_year: profile.graduation_year ? Number(profile.graduation_year) : null,
+        skills: split(profile.skills),
+        projects: split(profile.projects, '\n'),
+        experience: split(profile.experience, '\n'),
+      };
+      const updatedProfile = await api('/profile', {
+        method: 'PUT',
+        body: JSON.stringify(profileToSave),
+      });
+
+      setProfile({ ...emptyProfile, ...updatedProfile });
+      notify('Profile saved');
+      refresh();
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function split(value, separator = ',') {
+    if (Array.isArray(value)) return value;
+    return value.split(separator).map(item => item.trim()).filter(Boolean);
+  }
   async function addJob(e){e.preventDefault();try{const d=await api('/jobs',{method:'POST',body:JSON.stringify({...jobForm,required_skills:split(jobForm.required_skills),preferred_skills:split(jobForm.preferred_skills)})});setModal(false);setJobForm({title:'',company:'',location:'',url:'',description:'',required_skills:[],preferred_skills:[],employment_type:'Entry level'});await refresh();notify(`Saved ${d.title}`)}catch(err){setError(err.message)}}
   async function saveDiscoveredJob(job){try{const d=await api('/jobs',{method:'POST',body:JSON.stringify({...job,required_skills:[],preferred_skills:[]})});await refresh();notify(d.already_saved?`${d.title} is already saved`:`Saved ${d.title} for review`)}catch(err){setError(err.message)}}
   async function discover(){setBusy(true);try{const d=await api(`/jobs/discover?q=${encodeURIComponent(query)}&location=${encodeURIComponent(profile.preferences?.locations?.[0]||'')}`);setLiveJobs(d.jobs||[]);setError(d.available?'':d.message||'No live jobs were found. Try broader search terms.')}catch(e){setError(e.message)}finally{setBusy(false)}}
